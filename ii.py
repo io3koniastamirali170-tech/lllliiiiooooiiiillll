@@ -26,7 +26,7 @@ TOKEN = os.environ["BOT_TOKEN"]
 ADMIN_ID = 7438138322
 BOT_NAME = "🎮 VIP Config Shop"
 
-CATEGORIES = {"general": "🌍 عمومی", "premium": "⭐ ویژه", "hot": "🔥 داغ"}
+CATEGORIES = {"general": "🤌نیگر اراکی ", "premium": "🗣مولانا اراک ", "hot": "💦سیکیم دوروب "}
 NEW_USER_BONUS = 10
 REFERRAL_BONUS = 15
 DAILY_MIN, DAILY_MAX = 15, 50
