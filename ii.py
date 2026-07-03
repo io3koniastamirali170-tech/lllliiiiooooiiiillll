@@ -131,11 +131,11 @@ def cancel_kb():
 # ==================== منوها ====================
 def main_menu():
     keyboard = [
-        [InlineKeyboardButton("🛒 فروشگاه", callback_data="shop")],
-        [InlineKeyboardButton("💰 کیف پول", callback_data="wallet"),
-         InlineKeyboardButton("🎁 جایزه روزانه", callback_data="daily")],
-        [InlineKeyboardButton("📊 آمار من", callback_data="my_stats"),
-         InlineKeyboardButton("🎉 دعوت دوستان", callback_data="invite")],
+        [InlineKeyboardButton("دریافت کانفیگ", callback_data="shop")],
+        [InlineKeyboardButton("امتیاز ها ", callback_data="wallet"),
+         InlineKeyboardButton("امتیاز روزانه✨️", callback_data="daily")],
+        [InlineKeyboardButton("اطلاعات من🪪", callback_data="my_stats"),
+         InlineKeyboardButton(" دعوت دوستان", callback_data="invite")],
         [InlineKeyboardButton("❓ راهنما", callback_data="help")],
     ]
     return InlineKeyboardMarkup(keyboard)
