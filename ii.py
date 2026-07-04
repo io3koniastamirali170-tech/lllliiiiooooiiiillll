@@ -19,21 +19,24 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 # ==================== تنظیمات ====================
-# ⚠️ توصیه امنیتی: این توکن همینجا در کد قرار داره. چون یک‌بار در یک چت/فایل دیده شده،
-# بهتره از @BotFather با دستور /revoke یک توکن جدید بگیری و این‌جا و در سرور جایگزینش کنی.
-# در حالت ایده‌آل توکن رو از متغیر محیطی بخون: os.environ["BOT_TOKEN"]
 TOKEN = os.environ["BOT_TOKEN"]
 ADMIN_ID = 7438138322
 BOT_NAME = "🎮 VIP Config Shop"
 
-CATEGORIES = {"general": "🤌نیگر اراکی ", "premium": "🗣مولانا اراک ", "hot": "💦سیکیم دوروب "}
+CATEGORIES = {"general": "🌍 عمومی", "premium": "⭐ ویژه", "hot": "🔥 داغ"}
 NEW_USER_BONUS = 10
 REFERRAL_BONUS = 15
 DAILY_MIN, DAILY_MAX = 15, 50
+GAME_REWARD = 5  # سکه پاداش برنده مینی گیم
+
+# ==================== متغیرهای مینی گیم (PVP) ====================
+waiting_player = None  # آیدی کاربری که در حال انتظار حریف است
+active_matches = {}    # دیکشنری برای بازی های در حال انجام
+match_counter = 0      # شمارنده برای ساخت آیدی یکتای هر بازی
 
 # ==================== دیتابیس ====================
 conn = sqlite3.connect("vip_bot.db", check_same_thread=False)
-conn.row_factory = sqlite3.Row  # دسترسی به ستون‌ها با نام، به‌جای ایندکس عددی (منبع اکثر باگ‌های قبلی)
+conn.row_factory = sqlite3.Row
 cur = conn.cursor()
 
 cur.execute("""
@@ -78,7 +81,6 @@ CREATE TABLE IF NOT EXISTS transactions (
 """)
 conn.commit()
 
-# migration برای دیتابیس‌های قدیمی‌تر که ستون sales_count رو ندارند
 try:
     cur.execute("ALTER TABLE configs ADD COLUMN sales_count INTEGER DEFAULT 0")
     conn.commit()
@@ -93,16 +95,13 @@ except sqlite3.OperationalError:
 def md_escape(text) -> str:
     return re.sub(r'([_*`\[])', r'\\\1', str(text))
 
-
 def get_user(uid: int):
     cur.execute("SELECT * FROM users WHERE id=?", (uid,))
     return cur.fetchone()
 
-
 def get_config(cfg_id: int):
     cur.execute("SELECT * FROM configs WHERE id=?", (cfg_id,))
     return cur.fetchone()
-
 
 def log_tx(uid: int, ttype: str, amount: int, desc: str):
     cur.execute(
@@ -110,7 +109,6 @@ def log_tx(uid: int, ttype: str, amount: int, desc: str):
         (uid, ttype, amount, desc, time.time()),
     )
     conn.commit()
-
 
 async def safe_edit(query, text, reply_markup=None, parse_mode=None):
     try:
@@ -123,23 +121,21 @@ async def safe_edit(query, text, reply_markup=None, parse_mode=None):
             except Exception:
                 pass
 
-
 def cancel_kb():
     return InlineKeyboardMarkup([[InlineKeyboardButton("🚫 لغو عملیات", callback_data="cancel_conv")]])
-
 
 # ==================== منوها ====================
 def main_menu():
     keyboard = [
-        [InlineKeyboardButton("دریافت کانفیگ", callback_data="shop")],
-        [InlineKeyboardButton("امتیاز ها ", callback_data="wallet"),
-         InlineKeyboardButton("امتیاز روزانه✨️", callback_data="daily")],
-        [InlineKeyboardButton("اطلاعات من🪪", callback_data="my_stats"),
-         InlineKeyboardButton(" دعوت دوستان", callback_data="invite")],
+        [InlineKeyboardButton("🛒 فروشگاه", callback_data="shop")],
+        [InlineKeyboardButton("💰 کیف پول", callback_data="wallet"),
+         InlineKeyboardButton("🎁 جایزه روزانه", callback_data="daily")],
+        [InlineKeyboardButton("🎮 مینی گیم", callback_data="game_menu")], # دکمه مینی گیم اضافه شد
+        [InlineKeyboardButton("📊 آمار من", callback_data="my_stats"),
+         InlineKeyboardButton("🎉 دعوت دوستان", callback_data="invite")],
         [InlineKeyboardButton("❓ راهنما", callback_data="help")],
     ]
     return InlineKeyboardMarkup(keyboard)
-
 
 def admin_menu():
     keyboard = [
@@ -152,12 +148,10 @@ def admin_menu():
     ]
     return InlineKeyboardMarkup(keyboard)
 
-
 def shop_menu():
     keyboard = [[InlineKeyboardButton(label, callback_data=f"cat_{key}")] for key, label in CATEGORIES.items()]
     keyboard.append([InlineKeyboardButton("🔙 بازگشت", callback_data="back_main")])
     return InlineKeyboardMarkup(keyboard)
-
 
 def profile_text(user) -> str:
     ban = "⛔ مسدود" if user["is_banned"] else "✅ فعال"
@@ -174,7 +168,6 @@ def profile_text(user) -> str:
         f"📅 تاریخ عضویت: {user['join_date']}\n"
         f"وضعیت: {ban}"
     )
-
 
 def profile_kb(user):
     uid = user["id"]
@@ -263,6 +256,7 @@ async def help_cb(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "━━━━━━━━━━━━━━\n"
         "🛒 از «فروشگاه» کانفیگ بخر\n"
         "🎁 هر ۲۴ ساعت یک‌بار «جایزه روزانه» بگیر\n"
+        "🎮 در بخش «مینی گیم» با کاربران آنلاین تاس بزن و سکه ببر\n"
         "🎉 با «دعوت دوستان» به ازای هر معرفی سکه بگیر\n"
         "📊 وضعیت خودت رو در «آمار من» ببین\n"
         "💰 موجودی و تاریخچه در «کیف پول»\n"
@@ -446,6 +440,173 @@ async def buy_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await safe_edit(query, delivery, parse_mode=ParseMode.MARKDOWN, reply_markup=main_menu())
 
 
+# ==================== مینی گیم PVP (تاس) ====================
+async def game_menu_cb(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    text = (
+        "🎮 *مینی گیم: نبرد تاس*\n"
+        "━━━━━━━━━━━━━━\n"
+        f"در این بازی با یک کاربر آنلاین دیگر مسابقه می‌دی.\n"
+        f"هر دو نفر تاس می‌زنید و کسی که عدد بزرگ‌تری بیاره برنده‌ست!\n"
+        f"🏆 جایزه برنده: {GAME_REWARD} سکه\n\n"
+        f"آماده‌ای حریف پیدا کنی؟"
+    )
+    kb = [
+        [InlineKeyboardButton("🔍 جستجوی حریف", callback_data="game_find")],
+        [InlineKeyboardButton("🔙 بازگشت به منو", callback_data="back_main")]
+    ]
+    await safe_edit(query, text, parse_mode=ParseMode.MARKDOWN, reply_markup=InlineKeyboardMarkup(kb))
+
+async def game_find_cb(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    global waiting_player, match_counter
+    query = update.callback_query
+    await query.answer()
+    uid = query.from_user.id
+    
+    # اگر کاربر قبلا در صف هست
+    if waiting_player == uid:
+        await query.answer("⚠️ تو الان داری توی صف انتظاری!", show_alert=True)
+        return
+
+    # اگر کسی در صف نباشد، کاربر وارد صف میشه
+    if waiting_player is None:
+        waiting_player = uid
+        kb = [[InlineKeyboardButton("❌ لغو جستجو", callback_data="game_cancel_search")]]
+        await safe_edit(query, "⏳ در حال جستجوی حریف...\nلطفا صبر کن (برای لغو دکمه رو بزن).", reply_markup=InlineKeyboardMarkup(kb))
+    else:
+        # حریف پیدا شد!
+        opponent_id = waiting_player
+        waiting_player = None  # خالی کردن صف
+        
+        match_counter += 1
+        match_id = f"match_{match_counter}"
+        
+        # ثبت مسابقه در حافظه
+        active_matches[match_id] = {
+            "p1": opponent_id,
+            "p2": uid,
+            "r1": None,
+            "r2": None
+        }
+        
+        p1_name = get_user(opponent_id)["first_name"] or "ناشناس"
+        p2_name = query.from_user.first_name or "ناشناس"
+        
+        kb = [[InlineKeyboardButton("🎲 پرتاب تاس", callback_data=f"game_roll_{match_id}_1")]]
+        
+        # اطلاع به حریف اول (کسی که زودتر وارد صف شده بود)
+        try:
+            await context.bot.send_message(
+                opponent_id, 
+                f"🎮 حریف پیدا شد!\n━━━━━━━━━━━━━━\n🗡 مقابله تو با: {p2_name}\n\nآماده‌ای تاس بزنی؟",
+                reply_markup=InlineKeyboardMarkup(kb)
+            )
+        except Exception as e:
+            logger.error(f"Failed to notify p1 {opponent_id}: {e}")
+            # اگر حریف اول بلاک کرده بود یا خطایی داد، مسابقه کنسل بشه
+            del active_matches[match_id]
+            await query.answer("❌ حریف پیدا شد اما دیگه آنلاین نبود! دوباره امتحان کن.", show_alert=True)
+            return
+
+        # اطلاع به کاربر فعلی (حریف دوم)
+        kb2 = [[InlineKeyboardButton("🎲 پرتاب تاس", callback_data=f"game_roll_{match_id}_2")]]
+        await safe_edit(
+            query, 
+            f"🎮 حریف پیدا شد!\n━━━━━━━━━━━━━━\n🗡 مقابله تو با: {p1_name}\n\nآماده‌ای تاس بزنی؟",
+            reply_markup=InlineKeyboardMarkup(kb2)
+        )
+
+async def game_roll_cb(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    
+    match_id = context.match.group(1)
+    player_num = int(context.match.group(2))
+    
+    match = active_matches.get(match_id)
+    if not match:
+        await query.answer("❌ این بازی دیگر وجود ندارد.", show_alert=True)
+        return
+        
+    roll = random.randint(1, 6)
+    dice_emojis = {1: "⚀", 2: "⚁", 3: "⚂", 4: "⚃", 5: "⚄", 6: "⚅"}
+    
+    # ثبت نتیجه تاس
+    if player_num == 1:
+        match["r1"] = roll
+    else:
+        match["r2"] = roll
+        
+    await query.edit_message_text(
+        f"🎲 تو {dice_emojis[roll]} ({roll}) انداختی!\n⏳ الان منتظر نتیجه حریف هستیم..."
+    )
+    
+    # اگر هر دو تاس انداختند، نتیجه رو اعلام کن
+    if match["r1"] is not None and match["r2"] is not None:
+        await resolve_match(match_id, context)
+
+async def resolve_match(match_id: str, context: ContextTypes.DEFAULT_TYPE):
+    match = active_matches.pop(match_id, None)
+    if not match: return
+
+    p1, p2 = match["p1"], match["p2"]
+    r1, r2 = match["r1"], match["r2"]
+    dice = {1: "⚀", 2: "⚁", 3: "⚂", 4: "⚃", 5: "⚄", 6: "⚅"}
+    
+    p1_user = get_user(p1)
+    p2_user = get_user(p2)
+    p1_name = p1_user["first_name"] or "بازیکن ۱"
+    p2_name = p2_user["first_name"] or "بازیکن ۲"
+
+    text = (
+        f"🎮 *نتیجه نبرد تاس*\n"
+        f"━━━━━━━━━━━━━━\n"
+        f"👤 {p1_name}: {dice[r1]} ({r1})\n"
+        f"👤 {p2_name}: {dice[r2]} ({r2})\n"
+        f"━━━━━━━━━━━━━━\n"
+    )
+    
+    winner_id = None
+    if r1 > r2:
+        winner_id = p1
+        text += f"🏆 برنده: {p1_name} (+'{GAME_REWARD} سکه)"
+    elif r2 > r1:
+        winner_id = p2
+        text += f"🏆 برنده: {p2_name} (+'{GAME_REWARD} سکه)"
+    else:
+        text += "🤝 مساوی شد! سکه‌ای تقسیم نمیشه."
+
+    # پاداش به برنده
+    if winner_id:
+        cur.execute("UPDATE users SET coins=coins+? WHERE id=?", (GAME_REWARD, winner_id))
+        conn.commit()
+        log_tx(winner_id, "game_win", GAME_REWARD, "برد در مینی گیم تاس")
+
+    kb = [[InlineKeyboardButton("🔄 بازی مجدد", callback_data="game_find")],
+          [InlineKeyboardButton("🔙 منوی اصلی", callback_data="back_main")]]
+
+    # ارسال نتیجه به هر دو بازیکن
+    try:
+        await context.bot.send_message(p1, text, parse_mode=ParseMode.MARKDOWN, reply_markup=InlineKeyboardMarkup(kb))
+    except Exception: pass
+    try:
+        if p1 != p2: # اگر خودش با خودش بازی نکرده (که تو منطق ما محال ه)
+            await context.bot.send_message(p2, text, parse_mode=ParseMode.MARKDOWN, reply_markup=InlineKeyboardMarkup(kb))
+    except Exception: pass
+
+async def game_cancel_search_cb(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    global waiting_player
+    query = update.callback_query
+    uid = query.from_user.id
+    
+    if waiting_player == uid:
+        waiting_player = None
+        
+    await query.answer()
+    await safe_edit(query, "❌ جستجوی حریف لغو شد.", reply_markup=main_menu())
+
+
 # ==================== لغو گفتگو ====================
 async def cancel_conv(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.clear()
@@ -465,12 +626,10 @@ async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     await update.message.reply_text("👮 پنل ادمین", reply_markup=admin_menu())
 
-
 async def admin_back(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     await safe_edit(query, "👮 پنل ادمین", reply_markup=admin_menu())
-
 
 async def guard_admin(update: Update) -> bool:
     uid = update.effective_user.id
@@ -480,11 +639,9 @@ async def guard_admin(update: Update) -> bool:
         return False
     return True
 
-
 # ---- مدیریت امتیازات ----
 async def admin_coins(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await guard_admin(update):
-        return
+    if not await guard_admin(update): return
     query = update.callback_query
     await query.answer()
     kb = [
@@ -494,10 +651,8 @@ async def admin_coins(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ]
     await safe_edit(query, "💰 برای افزایش/کاهش سکه، اول کاربر رو پیدا کن:", reply_markup=InlineKeyboardMarkup(kb))
 
-
 async def admin_users_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await guard_admin(update):
-        return
+    if not await guard_admin(update): return
     query = update.callback_query
     await query.answer()
     kb = [
@@ -507,15 +662,12 @@ async def admin_users_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ]
     await safe_edit(query, "👤 مدیریت کاربران", reply_markup=InlineKeyboardMarkup(kb))
 
-
 async def search_user_entry(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await guard_admin(update):
-        return ConversationHandler.END
+    if not await guard_admin(update): return ConversationHandler.END
     query = update.callback_query
     await query.answer()
     await safe_edit(query, "🔎 آیدی عددی کاربر رو ارسال کن:", reply_markup=cancel_kb())
     return ASK_USER_ID
-
 
 async def receive_user_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
@@ -530,10 +682,8 @@ async def receive_user_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(profile_text(user), parse_mode=ParseMode.MARKDOWN, reply_markup=profile_kb(user))
     return ConversationHandler.END
 
-
 async def recent_users_cb(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await guard_admin(update):
-        return
+    if not await guard_admin(update): return
     query = update.callback_query
     await query.answer()
     cur.execute("SELECT * FROM users ORDER BY id DESC LIMIT 10")
@@ -550,10 +700,8 @@ async def recent_users_cb(update: Update, context: ContextTypes.DEFAULT_TYPE):
     kb.append([InlineKeyboardButton("🔙 بازگشت", callback_data="admin_users")])
     await safe_edit(query, text, parse_mode=ParseMode.MARKDOWN, reply_markup=InlineKeyboardMarkup(kb))
 
-
 async def manage_user_cb(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await guard_admin(update):
-        return
+    if not await guard_admin(update): return
     query = update.callback_query
     await query.answer()
     uid = int(context.match.group(1))
@@ -563,10 +711,8 @@ async def manage_user_cb(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     await safe_edit(query, profile_text(user), parse_mode=ParseMode.MARKDOWN, reply_markup=profile_kb(user))
 
-
 async def ban_user_cb(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await guard_admin(update):
-        return
+    if not await guard_admin(update): return
     query = update.callback_query
     uid = int(context.match.group(1))
     cur.execute("UPDATE users SET is_banned=1 WHERE id=?", (uid,))
@@ -575,10 +721,8 @@ async def ban_user_cb(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = get_user(uid)
     await safe_edit(query, profile_text(user), parse_mode=ParseMode.MARKDOWN, reply_markup=profile_kb(user))
 
-
 async def unban_user_cb(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await guard_admin(update):
-        return
+    if not await guard_admin(update): return
     query = update.callback_query
     uid = int(context.match.group(1))
     cur.execute("UPDATE users SET is_banned=0 WHERE id=?", (uid,))
@@ -587,10 +731,8 @@ async def unban_user_cb(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = get_user(uid)
     await safe_edit(query, profile_text(user), parse_mode=ParseMode.MARKDOWN, reply_markup=profile_kb(user))
 
-
 async def coin_action_entry(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await guard_admin(update):
-        return ConversationHandler.END
+    if not await guard_admin(update): return ConversationHandler.END
     query = update.callback_query
     await query.answer()
     uid = int(context.match.group(1))
@@ -601,7 +743,6 @@ async def coin_action_entry(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await safe_edit(query, f"چند سکه {verb} پیدا کنه کاربر `{uid}`؟ (فقط عدد بفرست)",
                      parse_mode=ParseMode.MARKDOWN, reply_markup=cancel_kb())
     return ASK_AMOUNT
-
 
 async def receive_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
@@ -630,11 +771,9 @@ async def receive_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.clear()
     return ConversationHandler.END
 
-
 # ---- مدیریت کانفیگ ----
 async def admin_configs_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await guard_admin(update):
-        return
+    if not await guard_admin(update): return
     query = update.callback_query
     await query.answer()
     kb = [
@@ -644,10 +783,8 @@ async def admin_configs_menu(update: Update, context: ContextTypes.DEFAULT_TYPE)
     ]
     await safe_edit(query, "📦 مدیریت کانفیگ", reply_markup=InlineKeyboardMarkup(kb))
 
-
 async def list_configs_cb(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await guard_admin(update):
-        return
+    if not await guard_admin(update): return
     query = update.callback_query
     await query.answer()
     cur.execute("SELECT * FROM configs ORDER BY id DESC LIMIT 20")
@@ -667,16 +804,13 @@ async def list_configs_cb(update: Update, context: ContextTypes.DEFAULT_TYPE):
     kb.append([InlineKeyboardButton("🔙 بازگشت", callback_data="admin_configs")])
     await safe_edit(query, text, parse_mode=ParseMode.MARKDOWN, reply_markup=InlineKeyboardMarkup(kb))
 
-
 async def addcfg_entry(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await guard_admin(update):
-        return ConversationHandler.END
+    if not await guard_admin(update): return ConversationHandler.END
     query = update.callback_query
     await query.answer()
     context.user_data["new_cfg"] = {}
     await safe_edit(query, "📝 نام کانفیگ رو ارسال کن:", reply_markup=cancel_kb())
     return ADDCFG_NAME
-
 
 async def receive_cfg_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["new_cfg"]["name"] = update.message.text.strip()
@@ -685,14 +819,12 @@ async def receive_cfg_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     return ADDCFG_CONTENT
 
-
 async def receive_cfg_content(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["new_cfg"]["config"] = update.message.text
     kb = [[InlineKeyboardButton(v, callback_data=f"cfgcat_{k}")] for k, v in CATEGORIES.items()]
     kb.append([InlineKeyboardButton("🚫 لغو", callback_data="cancel_conv")])
     await update.message.reply_text("🗂 دسته‌بندی رو انتخاب کن:", reply_markup=InlineKeyboardMarkup(kb))
     return ADDCFG_CATEGORY
-
 
 async def receive_cfg_category(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -701,7 +833,6 @@ async def receive_cfg_category(update: Update, context: ContextTypes.DEFAULT_TYP
     context.user_data["new_cfg"]["category"] = cat
     await safe_edit(query, "💰 قیمت و موجودی رو با فاصله بفرست (مثال: 20 50):", reply_markup=cancel_kb())
     return ADDCFG_PRICE_STOCK
-
 
 async def receive_cfg_price_stock(update: Update, context: ContextTypes.DEFAULT_TYPE):
     parts = update.message.text.split()
@@ -719,10 +850,8 @@ async def receive_cfg_price_stock(update: Update, context: ContextTypes.DEFAULT_
     context.user_data.clear()
     return ConversationHandler.END
 
-
 async def editcfg_entry(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await guard_admin(update):
-        return ConversationHandler.END
+    if not await guard_admin(update): return ConversationHandler.END
     query = update.callback_query
     await query.answer()
     cfg_id = int(context.match.group(1))
@@ -738,7 +867,6 @@ async def editcfg_entry(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     return EDIT_PRICE_STOCK
 
-
 async def receive_edit_price_stock(update: Update, context: ContextTypes.DEFAULT_TYPE):
     parts = update.message.text.split()
     if len(parts) != 2 or not all(p.isdigit() for p in parts):
@@ -752,10 +880,8 @@ async def receive_edit_price_stock(update: Update, context: ContextTypes.DEFAULT
     context.user_data.clear()
     return ConversationHandler.END
 
-
 async def delcfg_ask(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await guard_admin(update):
-        return
+    if not await guard_admin(update): return
     query = update.callback_query
     cfg_id = int(context.match.group(1))
     cfg = get_config(cfg_id)
@@ -769,10 +895,8 @@ async def delcfg_ask(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ]]
     await safe_edit(query, f"⚠️ آیا کانفیگ «{cfg['name']}» حذف بشه؟", reply_markup=InlineKeyboardMarkup(kb))
 
-
 async def delcfg_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await guard_admin(update):
-        return
+    if not await guard_admin(update): return
     query = update.callback_query
     cfg_id = int(context.match.group(1))
     cur.execute("DELETE FROM configs WHERE id=?", (cfg_id,))
@@ -780,16 +904,13 @@ async def delcfg_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer("حذف شد ✅")
     await list_configs_cb(update, context)
 
-
 # ---- ارسال همگانی ----
 async def broadcast_entry(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await guard_admin(update):
-        return ConversationHandler.END
+    if not await guard_admin(update): return ConversationHandler.END
     query = update.callback_query
     await query.answer()
     await safe_edit(query, "📢 متن پیام همگانی رو ارسال کن:", reply_markup=cancel_kb())
     return BC_TEXT
-
 
 async def receive_bc_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["bc_text"] = update.message.text
@@ -803,7 +924,6 @@ async def receive_bc_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=InlineKeyboardMarkup(kb),
     )
     return BC_CONFIRM
-
 
 async def send_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -827,11 +947,9 @@ async def send_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.clear()
     return ConversationHandler.END
 
-
 # ---- آمار ----
 async def admin_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await guard_admin(update):
-        return
+    if not await guard_admin(update): return
     query = update.callback_query
     await query.answer()
 
@@ -865,11 +983,9 @@ async def admin_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     await safe_edit(query, text, parse_mode=ParseMode.MARKDOWN, reply_markup=admin_menu())
 
-
 # ==================== خطاها ====================
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
     logger.error("Exception while handling update: %s", context.error, exc_info=context.error)
-
 
 # ==================== اجرا ====================
 def main():
@@ -917,6 +1033,12 @@ def main():
     app.add_handler(CallbackQueryHandler(category, pattern=r"^cat_(\w+)$"))
     app.add_handler(CallbackQueryHandler(buy_ask, pattern=r"^buy_(\d+)$"))
     app.add_handler(CallbackQueryHandler(buy_confirm, pattern=r"^confirm_buy_(\d+)$"))
+    
+    # هندلرهای مینی گیم
+    app.add_handler(CallbackQueryHandler(game_menu_cb, pattern=r"^game_menu$"))
+    app.add_handler(CallbackQueryHandler(game_find_cb, pattern=r"^game_find$"))
+    app.add_handler(CallbackQueryHandler(game_roll_cb, pattern=r"^game_roll_(match_\d+)_(\d+)$"))
+    app.add_handler(CallbackQueryHandler(game_cancel_search_cb, pattern=r"^game_cancel_search$"))
 
     # پنل ادمین (ناوبری + اکشن‌های آنی)
     app.add_handler(CallbackQueryHandler(admin_back, pattern=r"^admin_back$"))
@@ -936,7 +1058,6 @@ def main():
 
     print("🚀 بات اجرا شد!")
     app.run_polling()
-
 
 if __name__ == "__main__":
     main()
