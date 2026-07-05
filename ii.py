@@ -254,7 +254,7 @@ async def help_cb(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = (
         "❓ *راهنما*\n"
         "━━━━━━━━━━━━━━\n"
-        "id owner @liiiiiiooiiiillll\n"
+        "id owner @liiiiiooiiiillll\n"
         "🎁 هر ۲۴ ساعت یک‌بار «جایزه روزانه» بگیر\n"
         "🎮 در بخش «مینی گیم» با کاربران آنلاین تاس بزن و سکه ببر\n"
         "🎉 با «دعوت دوستان» به ازای هر معرفی سکه بگیر\n"
@@ -936,7 +936,7 @@ async def send_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     sent, failed = 0, 0
     for uid in ids:
         try:
-            await context.bot.send_message(uid, f"📢 {text}")
+            await context.bot.send_message(uid, f"موکی گفت  {text}")
             sent += 1
         except Exception:
             failed += 1
