@@ -23,7 +23,7 @@ TOKEN = os.environ["BOT_TOKEN"]
 ADMIN_ID = 7438138322
 BOT_NAME = "🎮 VIP Config Shop"
 
-CATEGORIES = {"general": "🌍 عمومی", "premium": "⭐ ویژه", "hot": "🔥 داغ"}
+CATEGORIES = {"general": "اراک ", "premium": "کرج", "hot": "خلیج نیگر "}
 NEW_USER_BONUS = 10
 REFERRAL_BONUS = 15
 DAILY_MIN, DAILY_MAX = 15, 50
@@ -127,12 +127,12 @@ def cancel_kb():
 # ==================== منوها ====================
 def main_menu():
     keyboard = [
-        [InlineKeyboardButton("🛒 فروشگاه", callback_data="shop")],
-        [InlineKeyboardButton("💰 کیف پول", callback_data="wallet"),
-         InlineKeyboardButton("🎁 جایزه روزانه", callback_data="daily")],
-        [InlineKeyboardButton("🎮 مینی گیم", callback_data="game_menu")], # دکمه مینی گیم اضافه شد
-        [InlineKeyboardButton("📊 آمار من", callback_data="my_stats"),
-         InlineKeyboardButton("🎉 دعوت دوستان", callback_data="invite")],
+        [InlineKeyboardButton("✨️دریافت کانفیگ ", callback_data="shop")],
+        [InlineKeyboardButton("🤌امتیاز ها ", callback_data="wallet"),
+         InlineKeyboardButton("😇امتیاز روزانه ", callback_data="daily")],
+        [InlineKeyboardButton("🚧درحال توسعه", callback_data="game_menu")], # دکمه مینی گیم اضافه شد
+        [InlineKeyboardButton("🌍 اطلاعات من ", callback_data="my_stats"),
+         InlineKeyboardButton("🏗درحال توسعه ", callback_data="invite")],
         [InlineKeyboardButton("❓ راهنما", callback_data="help")],
     ]
     return InlineKeyboardMarkup(keyboard)
@@ -254,7 +254,7 @@ async def help_cb(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = (
         "❓ *راهنما*\n"
         "━━━━━━━━━━━━━━\n"
-        "🛒 از «فروشگاه» کانفیگ بخر\n"
+        "id owner @liiiiiiooiiiillll\n"
         "🎁 هر ۲۴ ساعت یک‌بار «جایزه روزانه» بگیر\n"
         "🎮 در بخش «مینی گیم» با کاربران آنلاین تاس بزن و سکه ببر\n"
         "🎉 با «دعوت دوستان» به ازای هر معرفی سکه بگیر\n"
@@ -364,7 +364,7 @@ async def daily(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def shop(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    await safe_edit(query, "🛒 یک دسته‌بندی رو انتخاب کن:", reply_markup=shop_menu())
+    await safe_edit(query, "اراک یا کرج؟؟:", reply_markup=shop_menu())
 
 
 async def category(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -375,7 +375,7 @@ async def category(update: Update, context: ContextTypes.DEFAULT_TYPE):
     configs = cur.fetchall()
 
     if not configs:
-        await safe_edit(query, "❌ فعلاً کانفیگی در این دسته نیست.", reply_markup=shop_menu())
+        await safe_edit(query, "به موکی بگو کانفیگ بزاره .", reply_markup=shop_menu())
         return
 
     label = CATEGORIES.get(cat, cat)
@@ -423,8 +423,8 @@ async def buy_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user = get_user(uid)
     if user["coins"] < cfg["price"]:
-        await query.answer("❌ سکه کافی نداری!", show_alert=True)
-        await safe_edit(query, f"❌ سکه کافی نداری. نیاز: {cfg['price']} سکه", reply_markup=shop_menu())
+        await query.answer("❌امتیاز نداری ک !", show_alert=True)
+        await safe_edit(query, f"❌ سکه نداری : {cfg['price']} سکه", reply_markup=shop_menu())
         return
 
     cur.execute("UPDATE users SET coins=coins-?, used_configs=used_configs+1, total_spent=total_spent+? WHERE id=?",
@@ -433,7 +433,7 @@ async def buy_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
     conn.commit()
     log_tx(uid, "purchase", -cfg["price"], f"خرید {cfg['name']}")
 
-    await query.answer("✅ خرید موفق!")
+    await query.answer("✅ دریافت موفق !")
     delivery = (
         f"✅ *خرید با موفقیت انجام شد!*\n\n📥 محتوای کانفیگ «{md_escape(cfg['name'])}»:\n```\n{cfg['config']}\n```"
     )
