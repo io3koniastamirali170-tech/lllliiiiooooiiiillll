@@ -251,7 +251,7 @@ def profile_text(user) -> str:
 def profile_kb(user):
     uid = user["id"]
     ban_btn = (
-        InlineKeyboardButton("✅ رفع مسدودتت", callback_data=f"act_unban_{uid}")
+        InlineKeyboardButton("رفع مسدودتت", callback_data=f"act_unban_{uid}")
         if user["is_banned"]
         else InlineKeyboardButton("⛔ مسدود کردن", callback_data=f"act_ban_{uid}")
     )
