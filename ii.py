@@ -202,7 +202,7 @@ def main_menu():
          InlineKeyboardButton("🎉 دعوت دوستان", callback_data="invite")],
         [InlineKeyboardButton("🏆 جدول رتبه‌بندی", callback_data="leaderboard")],
         [InlineKeyboardButton("💬 پشتیبانی", callback_data="support_entry"),
-         InlineKeyboardButton("🌐 وبسایت ما", callback_data="website")],
+         InlineKeyboardButton(" وبسایت ما", callback_data="website")],
         [InlineKeyboardButton("❓ راهنما", callback_data="help")],
     ]
     return InlineKeyboardMarkup(keyboard)
