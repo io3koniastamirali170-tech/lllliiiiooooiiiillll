@@ -194,7 +194,7 @@ def time_ago(timestamp) -> str:
 # ==================== منوها ====================
 def main_menu():
     keyboard = [
-        [InlineKeyboardButton("✨ دریافت کانفیگ", callback_data="shop")],
+        [InlineKeyboardButton(" دریافت کانفیگ", callback_data="shop")],
         [InlineKeyboardButton("🤌 امتیاز ها", callback_data="wallet"),
          InlineKeyboardButton("😇 امتیاز روزانه", callback_data="daily")],
         [InlineKeyboardButton("🎮 مینی گیم", callback_data="game_menu")],
