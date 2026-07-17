@@ -200,7 +200,7 @@ def main_menu():
          InlineKeyboardButton("😇 امتیاز روزانه", callback_data="daily")],
         [InlineKeyboardButton("🎮 مینی گیم", callback_data="game_menu")],
         [InlineKeyboardButton("🌍 اطلاعات من", callback_data="my_stats"),
-         InlineKeyboardButton("🎉 دعوت دوستان", callback_data="invite")],
+         InlineKeyboardButton("دعوت دوستان", callback_data="invite")],
         [InlineKeyboardButton("🏆 جدول رتبه‌بندی", callback_data="leaderboard")],
         [InlineKeyboardButton("💬 پشتیبانی", callback_data="support_entry"),
          InlineKeyboardButton(" وبسایت ما", callback_data="website")],
