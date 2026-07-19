@@ -20,7 +20,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 # ==================== تنظیمات ====================
-TOKEN = os.environ["BOT_TOKEN"]
+TOKEN = "8877304020:AAE78bnqom8yajs847xBsJmB7LeWMbmZT6k"
 ADMIN_ID = 7438138322
 BOT_NAME = "🎮 VIP Config Shop"
 WEBSITE_URL = "https://liiiiiooiiiillll.sryze.cc"
